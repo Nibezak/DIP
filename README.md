@@ -37,18 +37,18 @@ flowchart TB
 
   subgraph Storage
     D --> E[Raw Zone: Object Storage (S3 or GCS)]
-    E -- Tiered Retention & Encryption --> F[Archive Zone]
+    E -->|Tiered Retention & Encryption| F[Archive Zone]
   end
 
   subgraph Processing
-    C --> G[Streaming ETL (Flink or Spark)]
+    C --> G[Streaming ETL: Flink or Spark]
     G --> H[Bronze Zone: Parquet Files]
     H --> I[Delta Lake or Iceberg]
     I --> J[Silver Zone: Clean Tables]
-    J --> K[Feature Store (Feast or Redis)]
+    J --> K[Feature Store: Feast or Redis]
   end
 
-  subgraph Orchestration & Governance
+  subgraph Orchestration
     L[Airflow or Prefect]
     L --> A
     L --> G
@@ -63,9 +63,11 @@ flowchart TB
     A --> N
     G --> N
     G --> O
+    N --> P
+    O --> P
   end
 
-  subgraph Security & Compliance
+  subgraph Security
     Q[Vault or KMS]
     R[IAM & RBAC]
     B --> Q
