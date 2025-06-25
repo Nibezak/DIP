@@ -26,30 +26,30 @@ The DIP architecture is designed for enterprise-grade throughput, reliability, a
 flowchart TB
   subgraph Connectors
     A[API Clients]
-    A -->|OAuth2 or API Key| B[Ingestion Gateway]
+    A -- OAuth2/API Key --> B[Ingestion Gateway]
   end
 
   subgraph Ingestion
-    B --> C[Message Broker (Kafka_PubSub)]
-    C --> D[Raw Ingest Topic]
+    B --> C[Message Broker: Kafka or PubSub]
+    C --> D[Raw Topic]
     C --> Z[Dead-Letter Queue]
   end
 
   subgraph Storage
-    D --> E[Raw Zone: Object Storage (S3/GCS)]
-    E -->|Tiered Retention & Encryption| F[Archive Zone]
+    D --> E[Raw Zone: Object Storage (S3 or GCS)]
+    E -- Tiered Retention & Encryption --> F[Archive Zone]
   end
 
   subgraph Processing
-    C --> G[Streaming ETL (Flink/Spark)]
-    G --> H[Bronze Zone: Parquet]
-    H --> I[Delta Lake / Iceberg]
-    I --> J[Silver Zone: Cleaned Tables]
-    J --> K[Feature Store (Feast/Redis)]
+    C --> G[Streaming ETL (Flink or Spark)]
+    G --> H[Bronze Zone: Parquet Files]
+    H --> I[Delta Lake or Iceberg]
+    I --> J[Silver Zone: Clean Tables]
+    J --> K[Feature Store (Feast or Redis)]
   end
 
   subgraph Orchestration & Governance
-    L[Airflow/Prefect]
+    L[Airflow or Prefect]
     L --> A
     L --> G
     L --> M[Schema Registry & Data Catalog]
@@ -59,14 +59,14 @@ flowchart TB
   subgraph Observability
     N[Prometheus Metrics]
     O[OpenTelemetry Traces]
-    P[Grafana / Kibana]
+    P[Grafana or Kibana]
     A --> N
     G --> N
     G --> O
   end
 
   subgraph Security & Compliance
-    Q[Vault/KMS]
+    Q[Vault or KMS]
     R[IAM & RBAC]
     B --> Q
     E --> R
@@ -74,8 +74,8 @@ flowchart TB
   end
 
   subgraph Downstream
-    K --> S[ML Training (Kubeflow/MLflow)]
-    K --> T[Realtime API (FastAPI)]
+    K --> S[ML Training: Kubeflow or MLflow]
+    K --> T[Realtime API: FastAPI]
     T --> U[BI Dashboard & Alerts]
   end
 ```
@@ -168,4 +168,3 @@ Key highlights:
 * **Auto‑Scaling**: Containerized workers scale on message queue depth or batch backlog.
 
 ---
-
