@@ -20,81 +20,119 @@ This workflow guarantees fresh, accurate inputs for any ML or analytics consumer
 
 ## 🏗 Architecture
 
-The DIP architecture is designed for high throughput, low latency, and strong reliability, with clear separation of concerns:
+The DIP architecture is designed for enterprise-grade throughput, reliability, and maintainability:
 
 ```mermaid
 flowchart TB
   subgraph Connectors
     A[API Clients]
-    A -->|OAuth2 / API Key| B[Ingestion Gateway]
+    A -->|OAuth2 or API Key| B[Ingestion Gateway]
   end
 
   subgraph Ingestion
-    B --> C[Message Broker (Kafka / PubSub)]
+    B --> C[Message Broker (Kafka_PubSub)]
     C --> D[Raw Ingest Topic]
+    C --> Z[Dead-Letter Queue]
   end
 
   subgraph Storage
-    D --> E[Raw Zone (Object Storage: S3/GCS)]
-    E -->|Retention Policies| F[Archive Zone]
+    D --> E[Raw Zone: Object Storage (S3/GCS)]
+    E -->|Tiered Retention & Encryption| F[Archive Zone]
   end
 
   subgraph Processing
-    C --> G[Streaming ETL (Flink / Spark Structured Streaming)]
-    G --> H[Bronze Zone (Parquet)]
+    C --> G[Streaming ETL (Flink/Spark)]
+    G --> H[Bronze Zone: Parquet]
     H --> I[Delta Lake / Iceberg]
-    I --> J[Silver Zone (Cleaned & Typed Tables)]
-    J --> K[Feature Store (Redis / Feast)]
+    I --> J[Silver Zone: Cleaned Tables]
+    J --> K[Feature Store (Feast/Redis)]
   end
 
   subgraph Orchestration & Governance
-    L[Airflow / Prefect]
+    L[Airflow/Prefect]
     L --> A
     L --> G
     L --> M[Schema Registry & Data Catalog]
     M --> G
   end
 
-  subgraph Monitoring & Observability
+  subgraph Observability
     N[Prometheus Metrics]
     O[OpenTelemetry Traces]
-    P[Grafana / Kibana Dashboards]
+    P[Grafana / Kibana]
     A --> N
     G --> N
     G --> O
   end
 
   subgraph Security & Compliance
-    Q[Vault / KMS for Secrets]
+    Q[Vault/KMS]
     R[IAM & RBAC]
     B --> Q
-    A --> R
     E --> R
-    I --> R
+    K --> R
   end
 
-  subgraph Downstream Consumers
-    K --> S[ML Training Jobs (Kubeflow / MLflow)]
-    K --> T[Real-time API (FastAPI)]
-    S --> U[Model Registry]
-    T --> V[BI Dashboard / Alerts]
+  subgraph Downstream
+    K --> S[ML Training (Kubeflow/MLflow)]
+    K --> T[Realtime API (FastAPI)]
+    T --> U[BI Dashboard & Alerts]
   end
 ```
 
-Key aspects:
+Key highlights:
 
-* **Decoupled Ingestion Gateway** for consistent auth, rate-limit handling, and backpressure signaling.
-* **Kafka / PubSub** ensures fault-tolerant, replayable ingestion streams with configurable retention.
-* **Multi-zone Storage** (Raw ▶ Bronze ▶ Silver) enforces schema evolution, data validation, idempotent writes, and partition pruning for performance.
-* **Streaming ETL** provides near real-time feature availability, implements watermarking for late-arriving data, and enforces exactly-once semantics when supported.
-* **Feature Store** (e.g. Feast) separates online (low-latency Redis) and offline (BigQuery/Snowflake) serving layers.
-* **Orchestration & Governance** via Airflow/Prefect connects ingestion, ETL, and training, while leveraging a Schema Registry for compatibility checks.
-* **Observability** with Prometheus and OpenTelemetry for end-to-end metrics, traces, and logs; Grafana/Kibana for dashboards and alerting.
-* **Security** through centralized secret management, fine-grained IAM/RBAC, encryption-at-rest, and audit logs.
+* **Ingestion Gateway** handles authentication, backpressure, and integrates with the DLQ for poison messages.
+* **Message Broker with DLQ** ensures at-least-once delivery and dead-lettering problematic records automatically.
+* **Multi-zone Storage** (Raw ▶ Bronze ▶ Silver) supports schema evolution, data validation, partition pruning, and encrypted retention policies.
+* **Streaming ETL** maintains event-time processing, watermarks, and exactly-once semantics, with side outputs for error handling.
+* **Feature Store** separates high-throughput online serving (Redis) from bulk offline retrieval (BigQuery/Snowflake).
+* **Orchestration & Governance** automates retries, tracks lineage, and ensures schema compatibility via the registry.
+* **Observability** provides end-to-end metrics, traces, and log correlation for rapid incident response.
+* **Security** enforces encryption-at-rest/in-transit, centralized secret management, and fine-grained access controls.
 
 ---
 
 ## ⚙️ Workflow Steps
+
+1. **Connect & Authenticate**
+
+   * Initialize connector with credentials from Vault/KMS.
+   * Validate connectivity and check API quotas.
+2. **Fetch & Stream**
+
+   * Pull paginated data in scheduled jobs or continuous streams.
+   * Publish each batch/message to the raw ingest topic in Kafka\_PubSub.
+3. **Validate & Persist Raw**
+
+   * Consumer writes raw JSON to object storage, partitioned by source/date.
+   * Poison messages routed to a Dead-Letter Queue for manual inspection.
+4. **Streaming ETL**
+
+   * Deserialize messages, apply schema validation from the registry.
+   * Transform timestamps, compute derived fields (e.g., engagement\_ratio).
+   * Emit cleaned records to Bronze Zone and archival sinks.
+5. **Batch/Historical Processing**
+
+   * Run nightly Spark jobs for backfills or reprocess historical data.
+6. **Feature Engineering**
+
+   * Aggregate time windows (hourly/daily), vectorize text (captions, hashtags).
+   * Store feature tables in Feature Store with versioning.
+7. **Consume & Serve**
+
+   * ML jobs pull offline features for model training.
+   * Real-time API queries online features to score new posts on demand.
+8. **Monitoring & Alerting**
+
+   * Track connector latencies, ETL processing times, and data freshness SLAs with Prometheus.
+   * Alert on errors, high DLQ rates, or schema mismatches via Grafana/Kibana.
+9. **Feedback Loop**
+
+   * Log predictions and real engagement metrics back into the pipeline for retraining.
+   * Enable A/B testing workflows by tagging traffic in inference endpoints.
+
+---
 
 1. **Connect**
    • Authenticate and fetch metrics (e.g. post views, likes, comments, audience demographics) via TikTok/Instagram APIs.
